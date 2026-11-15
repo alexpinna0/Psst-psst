@@ -1,0 +1,4 @@
+Psst-psst - versione alfa
+1. Carica TUTTI questi file (non la cartella dentro uno zip) su un hosting per siti statici (es. Netlify, GitHub Pages, Cloudflare Pages).
+2. Apri il link che ti danno. Su iPhone: Safari > Condividi > Aggiungi a Home. Su Android: Chrome > Installa app.
+3. I dati restano sul telefono di ciascuno. Usa Esporta album nelle impostazioni per i backup.
