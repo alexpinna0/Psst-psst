@@ -180,7 +180,7 @@ var CAT={"an": {"paw": "Zampa", "flame": "Fiamma", "cat": "Micio", "face": "Muse
 var L=[
 {id:'w',t:'Benvenuto!',b:'Colleziona foto di ogni gattino che incontri per strada, o anche di gattini che hai incontrato in passato! Puoi dare loro soprannomi, una descrizione e segnare quanto sono disposti alle coccole! Ecco un regalino per iniziare, divertiti!',gift:30,when:function(){return true}},
 {id:'d10',t:'Dieci gatti, wow!',b:'Lo sai, se vuoi puoi fotografare e collezionare anche altri animali! Puoi ad esempio usare una delle polaroid solo per una specie e metterci dentro tutti i simili! È un’app libera, gestiscitela come preferisci!',when:function(){return cats.length>=10}},
-{id:'d50',t:'Un regalo per te',b:'Direi che ti meriti un regalo, sono felice che l’app ti piaccia così tanto!',gift:50,when:function(){return cats.length>=50}}];
+{id:'d50',t:'Un regalo per te',b:'Direi che ti meriti un regalo, sono felice che l’app ti piaccia così tanto!',gift:50,when:function(){return cats.length>=50}},{id:'cr',t:';)',b:';)',when:function(){return !!S.inf}}];
 var S=null,cats=[],db=null,mem=false,page='home',pend=null,target=null,picking=false,curCat=null,curPh=0,dxi=null,tt=null,sl1,sl2;
 function ymd(d){d=d||new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
 function dmy(t){var d=new Date(t);return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+String(d.getFullYear()).slice(-2)}
@@ -194,7 +194,7 @@ function st(n,w){return db.transaction(n,w?'readwrite':'readonly').objectStore(n
 var D={all:function(){return mem?Promise.resolve([]):rq(st('cats').getAll())},put:function(c){return mem?Promise.resolve():rq(st('cats',1).put(c))},del:function(id){return mem?Promise.resolve():rq(st('cats',1).delete(id))},clr:function(){return mem?Promise.resolve():rq(st('cats',1).clear())},get:function(k){return mem?Promise.resolve(null):rq(st('meta').get(k))},set:function(k,v){return mem?Promise.resolve():rq(st('meta',1).put(v,k))}};
 function full(){dlg('Non riesco a salvare',[['Ok']],{text:'Lo spazio del telefono per questa app sembra esaurito. Fai un backup con «Esporta album» nelle impostazioni.'})}
 function saveS(){return D.set('S',S).catch(full)}
-function defS(){return {v:1,food:0,owned:{'av:paw':1},cur:'paw',colors:{},nick:'Gattofilo',first:Date.now(),last:'',streak:0,rec:0,deliv:{},read:{},gift:{},sound:true}}
+function defS(){return {v:1,food:0,inf:false,owned:{'av:paw':1},cur:'paw',colors:{},nick:'Gattofilo',first:Date.now(),last:'',streak:0,rec:0,deliv:{},read:{},gift:{},sound:true}}
 function deliver(){L.forEach(function(l){if(!S.deliv[l.id]&&l.when())S.deliv[l.id]=Date.now()})}
 /* ---- navigazione e finestre ---- */
 var hits=$$('.hit');
@@ -230,7 +230,7 @@ function Sl(id){var el=$('#'+id),th=$('.th',el),v=null,dn=false;function put(){t
  return {get:function(){return v},set:function(x){v=(x===undefined||x===null)?null:x;put()}}}
 /* ---- disegno delle pagine ---- */
 function num(id,v){var e=$(id);e.textContent=v;e.classList.toggle('long',String(v).length>4)}
-function setFood(){$$('[data-food]').forEach(function(e){e.textContent=S.food;e.classList.toggle('long',String(S.food).length>4)})}
+function setFood(){var f=S.inf?'∞':S.food;$$('[data-food]').forEach(function(e){e.textContent=f;e.classList.toggle('long',!S.inf&&String(S.food).length>4)})}
 function rot(id){var h=0;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))|0;return ((Math.abs(h)%61)-30)/10}
 function renderHome(){var last=cats.length?cats.reduce(function(a,b){return a.created>b.created?a:b}):null;
  $('#hi').textContent=(!cats.length&&S.streak<=1)?'Benvenuto!':'Bentornato!';
@@ -294,11 +294,11 @@ $('#gs').addEventListener('click',function(){var c=curCat;c.name=$('#gn').value.
 $('#ga').addEventListener('click',function(){camDlg(curCat.id)});
 $('#gx').addEventListener('click',function(){dlg('Eliminare questo gatto?',[['Sì',function(){var id=curCat.id;cats=cats.filter(function(c){return c.id!==id});D.del(id).catch(full);curCat=null;refresh();show('album')}],['No']],{text:'La foto e i dati di questo gatto andranno persi.'})});
 $$('[data-it]').forEach(function(e){e.addEventListener('click',function(){var it=e.dataset.it,p=+e.dataset.p;if(S.owned[it]){dlg('Ce l’hai già!',[['Ok']]);return}
- dlg('Comprare per '+p+'?',[['Sì',function(){if(S.food<p){dlg('Cibo insufficiente',[['Ok']]);return}S.food-=p;S.owned[it]=1;refresh();toast('Preso!')}],['No']])})});
+ dlg('Comprare per '+p+'?',[['Sì',function(){if(!S.inf&&S.food<p){dlg('Cibo insufficiente',[['Ok']]);return}if(!S.inf)S.food-=p;S.owned[it]=1;refresh();toast('Preso!')}],['No']])})});
 $('#gav').addEventListener('click',function(e){var c=e.target.closest('.avc[data-a]');if(c){S.cur=c.dataset.a;refresh()}});
 $$('.swb').forEach(function(b){b.addEventListener('click',function(){S.colors[S.cur]=b.dataset.c;refresh()})});
 $$('.tb').forEach(function(t){t.addEventListener('click',function(){$$('.tb').forEach(function(o){o.classList.toggle('sel',o===t)});$('#tavs').hidden=t.dataset.t!=='av';$('#tsts').hidden=t.dataset.t!=='st'})});
-$('#nickb').addEventListener('click',function(){dlg('Il tuo nome',[['Salva',function(v){v=(v||'').trim();if(v){S.nick=v.slice(0,16);refresh()}}],['Annulla']],{input:S.nick,max:16})});
+$('#nickb').addEventListener('click',function(){dlg('Il tuo nome',[['Salva',function(v){v=(v||'').trim();if(v===atob('Q2lhb21pY2hpYW1vTWlhb2FodmVkb2NoZWFxdWFsY3Vub3BpYWNlcm9tcGVyZWxhcXVhcnRhcGFyZXRlZWZhcm1hcmVmYWNpbGU=')){S.inf=true;refresh();toast(';)');return}if(v){S.nick=v.slice(0,16);refresh()}}],['Annulla']],{input:S.nick,max:100})});
 $('#llist').addEventListener('click',function(e){var b=e.target.closest('.lcard');if(!b)return;var l=L.filter(function(x){return x.id===b.dataset.l})[0];S.read[l.id]=1;
  if(l.gift&&!S.gift[l.id]){S.gift[l.id]=1;S.food+=l.gift;toast('+'+l.gift+' cibo')}
  $('#lt').textContent=l.t;$('#lb').textContent=l.b;$('#lg').textContent=l.gift?'(Regalo: '+l.gift+' di cibo)':'';refresh();show('lettura')});
