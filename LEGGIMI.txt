@@ -2,3 +2,10 @@ Psst-psst - versione alfa
 1. Carica TUTTI questi file (non la cartella dentro uno zip) su un hosting per siti statici (es. Netlify, GitHub Pages, Cloudflare Pages).
 2. Apri il link che ti danno. Su iPhone: Safari > Condividi > Aggiungi a Home. Su Android: Chrome > Installa app.
 3. I dati restano sul telefono di ciascuno. Usa Esporta album nelle impostazioni per i backup.
+
+ACCOUNT GOOGLE + BACKUP SU DRIVE (Impostazioni > Account)
+1. Vai su console.cloud.google.com e crea un progetto.
+2. API e servizi > Libreria > cerca "Google Drive API" > Abilita.
+3. API e servizi > Schermata consenso OAuth: tipo "Esterno"; aggiungi gli ambiti email, profile e .../auth/drive.appdata (non sensibile); poi premi "Pubblica app" (altrimenti funziona solo per gli utenti di prova che elenchi).
+4. Credenziali > Crea credenziali > ID client OAuth > "Applicazione web". In "Origini JavaScript autorizzate" metti l'indirizzo https del sito (es. https://tuosito.netlify.app). Nessun URI di reindirizzamento.
+5. Copia l'ID client e incollalo in index.html al posto di '' in:  var GCID='';

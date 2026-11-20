@@ -191,10 +191,10 @@ function find(id){for(var i=0;i<cats.length;i++)if(cats[i].id===id)return cats[i
 function idb(){return new Promise(function(res){try{var r=indexedDB.open('psst',1);r.onupgradeneeded=function(){var d=r.result;d.createObjectStore('cats',{keyPath:'id'});d.createObjectStore('meta')};r.onsuccess=function(){db=r.result;res(true)};r.onerror=r.onblocked=function(){res(false)}}catch(e){res(false)}})}
 function rq(r){return new Promise(function(res,rej){r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}})}
 function st(n,w){return db.transaction(n,w?'readwrite':'readonly').objectStore(n)}
-var D={all:function(){return mem?Promise.resolve([]):rq(st('cats').getAll())},put:function(c){return mem?Promise.resolve():rq(st('cats',1).put(c))},del:function(id){return mem?Promise.resolve():rq(st('cats',1).delete(id))},clr:function(){return mem?Promise.resolve():rq(st('cats',1).clear())},get:function(k){return mem?Promise.resolve(null):rq(st('meta').get(k))},set:function(k,v){return mem?Promise.resolve():rq(st('meta',1).put(v,k))}};
+var D={all:function(){return mem?Promise.resolve([]):rq(st('cats').getAll())},put:function(c,raw){if(!raw)c.u=Date.now();schedBk();return mem?Promise.resolve():rq(st('cats',1).put(c))},del:function(id){return mem?Promise.resolve():rq(st('cats',1).delete(id))},clr:function(){return mem?Promise.resolve():rq(st('cats',1).clear())},get:function(k){return mem?Promise.resolve(null):rq(st('meta').get(k))},set:function(k,v){return mem?Promise.resolve():rq(st('meta',1).put(v,k))}};
 function full(){dlg('Non riesco a salvare',[['Ok']],{text:'Lo spazio del telefono per questa app sembra esaurito. Fai un backup con «Esporta album» nelle impostazioni.'})}
 function saveS(){return D.set('S',S).catch(full)}
-function defS(){return {v:1,food:0,inf:false,owned:{'av:paw':1},cur:'paw',colors:{},nick:'Gattofilo',first:Date.now(),last:'',streak:0,rec:0,deliv:{},read:{},gift:{},sound:true}}
+function defS(){return {v:1,food:0,inf:false,owned:{'av:paw':1},cur:'paw',colors:{},nick:'Gattofilo',first:Date.now(),last:'',streak:0,rec:0,deliv:{},read:{},gift:{},sound:true,acct:null}}
 function deliver(){L.forEach(function(l){if(!S.deliv[l.id]&&l.when())S.deliv[l.id]=Date.now()})}
 /* ---- navigazione e finestre ---- */
 var hits=$$('.hit');
@@ -253,8 +253,8 @@ function renderShop(){$$('[data-it]').forEach(function(e){e.classList.toggle('ow
 function renderLetters(){var d=L.filter(function(l){return S.deliv[l.id]}).sort(function(a,b){return S.deliv[b.id]-S.deliv[a.id]});
  $('#llist').innerHTML=d.map(function(l,i){return '<button class="bxx lcard" style="--fill:var(--c'+(i%2?3:4)+')" data-l="'+l.id+'"><span class="w env"><i class="ico i-'+(S.read[l.id]?'envo':'envc')+'"></i></span><span class="lt g">'+esc(l.t)+'</span></button>'}).join('');
  $('#dot').hidden=!L.some(function(l){return S.deliv[l.id]&&!S.read[l.id]})}
-function renderSet(){$$('.spk').forEach(function(s,i){s.classList.toggle('on',(i===0)===S.sound)})}
-function refresh(){deliver();renderHome();renderAlbum();renderProfile();renderShop();renderLetters();renderSet();saveS()}
+function renderSet(){$$('.spk').forEach(function(s,i){s.classList.toggle('on',(i===0)===S.sound)});var ba=$('#bacc .g');if(ba)ba.textContent=S.acct?'Account: '+acctName():'Account'}
+function refresh(){deliver();renderHome();renderAlbum();renderProfile();renderShop();renderLetters();renderSet();saveS();schedBk()}
 /* ---- scheda gatto ---- */
 function drawPhoto(){var c=curCat;drawStk();$('#gwin').innerHTML='<img class="ph" alt="" src="'+c.photos[curPh]+'">';$('#gcap').textContent=c.name||dmy(c.created);
  $('#gth').innerHTML=c.photos.length>1?c.photos.map(function(p,i){return '<button class="bxx tmb'+(i===curPh?' sel':'')+'" data-i="'+i+'" aria-label="Foto '+(i+1)+'"><img alt="" src="'+p+'"></button>'}).join(''):''}
@@ -262,7 +262,7 @@ function drawCat(){var c=curCat;if(!c)return;SK=-1;renderStp();$('#gt').textCont
 function openCat(id){var c=find(id);if(!c)return;curCat=c;curPh=0;drawCat();show('gatto')}
 function showPreso(){$('#pwin').innerHTML='<img class="ph" alt="" src="'+pend.src+'">';$('#pcap').textContent=dmy(Date.now());sl1.set(null);$('#pn').value='';$('#pd').value='';show('preso')}
 /* ---- backup ---- */
-function makeBackup(){var blob=new Blob([JSON.stringify({v:1,S:S,cats:cats})],{type:'application/json'});return {blob:blob,name:'psst-psst-album-'+ymd()+'.json'}}
+function makeBackup(){var blob=new Blob([JSON.stringify({v:1,S:Object.assign({},S,{acct:null,bk:null}),cats:cats})],{type:'application/json'});return {blob:blob,name:'psst-psst-album-'+ymd()+'.json'}}
 function saveFile(){var k=makeBackup();
  try{if(window.claude&&window.claude.use){window.claude.use('downloads').then(function(d){if(d)d.save({filename:k.name,data:k.blob}).catch(function(){});else anchor(k)},function(){anchor(k)});return}}catch(e){}
  anchor(k)}
@@ -274,7 +274,7 @@ function shareFile(){var k=makeBackup(),f=null,g=null;try{f=new File([k.blob],k.
 function exportAll(){dlg('Esporta album',[['Salva file',saveFile],['Condividi',shareFile],['Annulla']],{text:'Il backup è un file con tutti i tuoi gatti e le tue foto. Conservalo al sicuro: potrai importarlo se cambi telefono.'})}
 function importAll(f){if(!f)return;var r=new FileReader();r.onload=function(){var d;try{d=JSON.parse(r.result)}catch(e){}
  if(!d||d.v!==1||!Array.isArray(d.cats)){dlg('File non valido',[['Ok']]);return}
- dlg('Sostituire il tuo album?',[['Sì',function(){D.clr().then(function(){return Promise.all(d.cats.map(function(c){return D.put(c)}))}).then(function(){cats=d.cats;S=Object.assign(defS(),d.S||{});sane();refresh();show('home');toast('Album importato')}).catch(full)}],['No']],{text:'I gatti e i dati che hai ora verranno sostituiti da quelli del file.'})};r.readAsText(f)}
+ dlg('Sostituire il tuo album?',[['Sì',function(){D.clr().then(function(){return Promise.all(d.cats.map(function(c){return D.put(c)}))}).then(function(){cats=d.cats;var ac=S.acct,bk0=S.bk;S=Object.assign(defS(),d.S||{});S.acct=ac||null;S.bk=bk0||null;sane();refresh();show('home');toast('Album importato')}).catch(full)}],['No']],{text:'I gatti e i dati che hai ora verranno sostituiti da quelli del file.'})};r.readAsText(f)}
 /* ---- collegamenti ---- */
 hits.forEach(function(b){b.addEventListener('pointerdown',function(){b.classList.add('press')});['pointerup','pointercancel','pointerleave'].forEach(function(e){b.addEventListener(e,function(){b.classList.remove('press')})});
  b.addEventListener('click',function(){var k=b.dataset.k;if(k==='cam'||k==='plus')camDlg(null);else show(B2P[k])})});
@@ -309,8 +309,63 @@ $('#bexp').addEventListener('click',exportAll);
 $('#cshot').addEventListener('click',camShot);$('#cclose').addEventListener('click',camStop);$('#cflip').addEventListener('click',function(){facing=facing==='environment'?'user':'environment';camStop();camStart()});
 $('#bimp').addEventListener('click',function(){$('#fimp').click()});
 $('#fimp').addEventListener('change',function(){var f=this.files[0];this.value='';importAll(f)});
-$('#bpriv').addEventListener('click',function(){dlg('Privacy',[['Ok']],{text:'Le tue foto e i tuoi dati restano sul tuo telefono e non vengono inviati a nessuno. Se cancelli i dati del browser o disinstalli l’app li perdi: ogni tanto usa «Esporta album» per fare un backup.'})});
-$('#bacc').addEventListener('click',function(){dlg('Presto disponibile',[['Ok']])});
+$('#bpriv').addEventListener('click',function(){dlg('Privacy',[['Ok']],{text:'Le tue foto e i tuoi dati restano sul tuo telefono e non vengono inviati a nessuno. Se colleghi un account Google, l’album viene salvato nella cartella privata dell’app sul tuo Google Drive, visibile solo a te. Se cancelli i dati del browser o disinstalli l’app li perdi: ogni tanto usa «Esporta album» per fare un backup.'})});
+/* ---- account Google + backup su Drive (cartella privata dell'app) ---- */
+var GCID='2239476105-ohfk674q6uipsdsvnt8braj4ff0n3pem.apps.googleusercontent.com';/* <-- QUI il Client ID OAuth di Google, tipo 123-abc.apps.googleusercontent.com */
+var DR='https://www.googleapis.com/auth/drive.appdata',SC='openid email profile '+DR,tok=null,tokExp=0,tc=null,tw=null,lastR=null,bkBusy=false,bkt=null;
+function gsi(){return new Promise(function(res,rej){if(window.google&&google.accounts&&google.accounts.oauth2){res();return}var e=document.createElement('script');e.src='https://accounts.google.com/gsi/client';e.async=true;e.onload=function(){res()};e.onerror=function(){rej(new Error('gsi'))};document.head.appendChild(e)})}
+function tokOK(){return !!tok&&Date.now()<tokExp-60000}
+function getTok(force){return new Promise(function(res,rej){if(!force&&tokOK()){res(tok);return}
+  if(!(window.google&&google.accounts&&google.accounts.oauth2)){rej(new Error('gsi'));return}
+  if(!tc)tc=google.accounts.oauth2.initTokenClient({client_id:GCID,scope:SC,callback:function(r){var w=tw;tw=null;if(!w)return;if(r&&r.access_token){lastR=r;tok=r.access_token;tokExp=Date.now()+(+r.expires_in||3600)*1000;w.res(tok)}else w.rej(new Error((r&&r.error)||'auth'))},error_callback:function(e){var w=tw;tw=null;if(w)w.rej(new Error((e&&e.type)||'auth'))}});
+  tw={res:res,rej:rej};tc.requestAccessToken(S.acct?{prompt:'',login_hint:S.acct.email}:{prompt:'select_account'})})}
+function dapi(t,u,o){o=o||{};o.headers=Object.assign({Authorization:'Bearer '+t},o.headers||{});return fetch(u,o).then(function(r){if(r.status===401)tok=null;if(!r.ok)throw new Error('drive '+r.status);return r})}
+function dlist(t,pt,m){m=m||{};return dapi(t,'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&pageSize=1000&fields=nextPageToken,files(id,name)'+(pt?'&pageToken='+encodeURIComponent(pt):'')).then(function(r){return r.json()}).then(function(j){(j.files||[]).forEach(function(f){m[f.name]=f.id});return j.nextPageToken?dlist(t,j.nextPageToken,m):m})}
+function dget(t,id){return dapi(t,'https://www.googleapis.com/drive/v3/files/'+id+'?alt=media').then(function(r){return r.json()})}
+function ddel(t,id){return dapi(t,'https://www.googleapis.com/drive/v3/files/'+id,{method:'DELETE'})}
+function dput(t,name,obj,id){var b='psst'+Date.now(),meta=id?{}:{name:name,parents:['appDataFolder']};
+  var body=new Blob(['--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n',JSON.stringify(meta),'\r\n--'+b+'\r\nContent-Type: application/json\r\n\r\n',JSON.stringify(obj),'\r\n--'+b+'--']);
+  return dapi(t,'https://www.googleapis.com/upload/drive/v3/files'+(id?'/'+id:'')+'?uploadType=multipart&fields=id',{method:id?'PATCH':'POST',headers:{'Content-Type':'multipart/related; boundary='+b},body:body})}
+function stateObj(){var o=Object.assign({},S);delete o.acct;delete o.bk;delete o.ask;return o}
+function bkNeed(){var b=S&&S.bk;if(!b)return true;if(JSON.stringify(stateObj())!==b.sig)return true;if(cats.some(function(c){return b.sent[c.id]!==(c.u||0)}))return true;return Object.keys(b.sent).some(function(id){return !find(id)})}
+function schedBk(){if(!S||!S.acct||!tokOK())return;clearTimeout(bkt);bkt=setTimeout(function(){if(tokOK()&&!bkBusy&&bkNeed())doBackup(false)},15000)}
+function bkErr(e,man){bkBusy=false;var m=String((e&&e.message)||e);if(!man||/popup_closed|access_denied/.test(m))return;
+  dlg('Operazione non riuscita',[['Ok']],{text:/gsi|Failed to fetch|NetworkError/.test(m)?'Non riesco a contattare Google. Controlla la connessione e riprova.':/403/.test(m)?'Google Drive ha rifiutato l’operazione: forse lo spazio è pieno o manca il permesso.':/401/.test(m)?'La sessione è scaduta: riprova.':'Qualcosa è andato storto ('+m+'). Riprova.'})}
+function doBackup(man,force){if(bkBusy||!S.acct||!GCID)return;
+  getTok().then(function(t){bkBusy=true;if(man)toast('Salvo nel Drive…');
+    return dlist(t).then(function(m){
+      if(!S.bk&&m['state.json']&&!force){bkBusy=false;if(man)dlg('Backup già presente',[['Ripristina',function(){doRestore()}],['Sovrascrivi',function(){doBackup(true,true)}],['Annulla']],{text:'Nel tuo Drive c’è già un backup. Vuoi ripristinarlo oppure sostituirlo con l’album di questo telefono?'});return}
+      var sent=Object.assign({},(S.bk&&S.bk.sent)||{}),st=stateObj(),sig=JSON.stringify(st),p=Promise.resolve();
+      cats.slice().forEach(function(c){var u=c.u||0;if(sent[c.id]!==u)p=p.then(function(){return dput(t,'cat-'+c.id+'.json',c,m['cat-'+c.id+'.json'])}).then(function(){sent[c.id]=u})});
+      Object.keys(sent).forEach(function(id){if(!find(id))p=p.then(function(){return m['cat-'+id+'.json']?ddel(t,m['cat-'+id+'.json']):0}).then(function(){delete sent[id]})});
+      return p.then(function(){return dput(t,'state.json',{v:1,t:Date.now(),S:st},m['state.json'])}).then(function(){S.bk={t:Date.now(),sig:sig,sent:sent};saveS();bkBusy=false;if(man)toast('Backup salvato')})})
+  }).catch(function(e){bkErr(e,man)})}
+function doRestore(){if(!S.acct||!GCID||bkBusy)return;
+  getTok().then(function(t){bkBusy=true;toast('Cerco il backup…');
+    return dlist(t).then(function(m){
+      if(!m['state.json']){bkBusy=false;dlg('Nessun backup',[['Ok']],{text:'Nel tuo Drive non c’è ancora nessun backup.'});return}
+      return dget(t,m['state.json']).then(function(st){
+        var ns=Object.keys(m).filter(function(n){return /^cat-.+\.json$/.test(n)}),got=[],p=Promise.resolve();
+        ns.forEach(function(n,i){p=p.then(function(){toast('Scarico '+(i+1)+'/'+ns.length+'…');return dget(t,m[n])}).then(function(c){if(c&&c.id&&Array.isArray(c.photos))got.push(c)})});
+        return p.then(function(){return D.clr()}).then(function(){return Promise.all(got.map(function(c){return D.put(c,1)}))}).then(function(){
+          var ac=S.acct,sent={};got.forEach(function(c){sent[c.id]=c.u||0});cats=got;S=Object.assign(defS(),(st&&st.S)||{});S.acct=ac;sane();refresh();
+          S.bk={t:Date.now(),sig:JSON.stringify(stateObj()),sent:sent};saveS();bkBusy=false;show('home');toast('Album ripristinato')})})})
+  }).catch(function(e){bkErr(e,true)})}
+function afterLogin(t){dlist(t).then(function(m){if(m['state.json']&&!S.bk)dlg('Backup trovato',[['Ripristina',function(){doRestore()}],['Più tardi']],{text:'Nel tuo Drive c’è già un backup. Vuoi ripristinarlo su questo telefono? Sostituirà l’album che hai ora.'});else doBackup(true)}).catch(function(){})}
+function doLogin(){if(!GCID)return;
+  getTok(true).then(function(t){if(!google.accounts.oauth2.hasGrantedAllScopes(lastR,DR)){tok=null;dlg('Permesso mancante',[['Riprova',doLogin],['Annulla']],{text:'Per salvare il backup devi spuntare il permesso per Google Drive nella schermata di Google.'});return}
+    return fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+t}}).then(function(r){return r.json()}).then(function(u){if(!u||!u.sub)throw new Error('userinfo');
+      S.acct={sub:u.sub,email:u.email||'',name:u.name||'',pic:u.picture||'',t:Date.now()};S.bk=null;refresh();toast('Account collegato');afterLogin(t)})
+  }).catch(function(e){bkErr(e,true)})}
+function acctName(){var a=S.acct;return a?(a.name||a.email||'').split(' ')[0].slice(0,14):''}
+function bkTxt(){var b=S.bk;if(!b)return 'Nessun backup ancora.';var d=new Date(b.t);return 'Ultimo backup: '+dmy(b.t)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+'.'}
+function acctDlg(){
+  if(!GCID){dlg('Account non ancora attivo',[['Ok']],{text:'Manca la configurazione di Google (Client ID).'});return}
+  gsi().catch(function(){});
+  if(S.acct){dlg('Account',[['Salva ora',function(){doBackup(true,false)}],['Ripristina',function(){dlg('Ripristinare dal Drive?',[['Sì',function(){doRestore()}],['No']],{text:'L’album di questo telefono verrà sostituito con l’ultimo backup salvato nel tuo Drive.'})}],['Scollega',function(){dlg('Scollegare l’account?',[['Sì',function(){S.acct=null;S.bk=null;tok=null;refresh();toast('Account scollegato')}],['No']],{text:'Il tuo album resta sul telefono e il backup resta nel Drive: non viene cancellato nulla.'})}],['Ok']],{text:'Collegato come '+(S.acct.name?S.acct.name+' ':'')+(S.acct.email?'('+S.acct.email+')':'')+'. '+bkTxt()});return}
+  dlg('Collega account',[['Accedi con Google',doLogin],['Annulla']],{text:'Accedi con Google per salvare l’album nel tuo Drive, in una cartella privata dell’app, e ritrovarlo anche su un altro telefono. Quando Google lo chiede, consenti l’accesso a Drive.'})}
+function bkAsk(){if(!S.acct||mem||!bkNeed())return;var t=ymd();if(S.ask===t||(S.bk&&Date.now()-S.bk.t<864e5))return;S.ask=t;saveS();dlg('Salvare il backup?',[['Salva ora',function(){doBackup(true,false)}],['Più tardi']],{text:S.bk?'Sono passati un po’ di giorni dall’ultimo backup nel Drive. Vuoi salvare ora per non perdere i tuoi gatti?':'Non hai ancora fatto nessun backup nel Drive. Vuoi salvare ora?'})}
+$('#bacc').addEventListener('click',acctDlg);
 /* ---- stickers sulla polaroid ---- */
 var SK=-1,SP={},sref=null,skOff=false;
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
@@ -404,6 +459,7 @@ idb().then(function(ok){mem=!ok;return Promise.all([D.get('S'),D.all(),D.get('G'
  refresh();try{history.replaceState({p:'home'},'')}catch(e){}show('home',true);
  if(mem)dlg('Salvataggio non disponibile',[['Ok']],{text:'Questo browser non permette di salvare i dati: quello che aggiungi sparirà alla chiusura. Prova ad aprire l’app da Safari o Chrome normali, non in navigazione privata.'});
  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+  if(S.acct&&GCID){gsi().catch(function(){});setTimeout(bkAsk,1500)}
  if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(function(){})});
 })();
 </script></body></html>
