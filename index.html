@@ -329,7 +329,7 @@ function dput(t,name,obj,id){var b='psst'+Date.now(),meta=id?{}:{name:name,paren
 function stateObj(){var o=Object.assign({},S);delete o.acct;delete o.bk;delete o.ask;return o}
 function bkNeed(){var b=S&&S.bk;if(!b)return true;if(JSON.stringify(stateObj())!==b.sig)return true;if(cats.some(function(c){return b.sent[c.id]!==(c.u||0)}))return true;return Object.keys(b.sent).some(function(id){return !find(id)})}
 function schedBk(){if(!S||!S.acct||!tokOK())return;clearTimeout(bkt);bkt=setTimeout(function(){if(tokOK()&&!bkBusy&&bkNeed())doBackup(false)},15000)}
-function bkErr(e,man){bkBusy=false;var m=String((e&&e.message)||e);if(!man||/popup_closed|access_denied/.test(m))return;
+function bkErr(e,man){bkBusy=false;var m=String((e&&e.message)||e);if(!man)return;if(/popup_closed|popup_failed|access_denied|auth/.test(m)){dlg('Accesso a Google non riuscito',[['Ok']],{text:'Non riesco ad aprire la finestra di Google da qui. Prova ad aprire lo stesso indirizzo dell’app direttamente in Chrome e premi di nuovo Salva ora. Codice: '+m});return}
   dlg('Operazione non riuscita',[['Ok']],{text:/gsi|Failed to fetch|NetworkError/.test(m)?'Non riesco a contattare Google. Controlla la connessione e riprova.':/403/.test(m)?'Google Drive ha rifiutato l’operazione: forse lo spazio è pieno o manca il permesso.':/401/.test(m)?'La sessione è scaduta: riprova.':'Qualcosa è andato storto ('+m+'). Riprova.'})}
 function doBackup(man,force){if(bkBusy||!S.acct||!GCID)return;
   getTok().then(function(t){bkBusy=true;if(man)toast('Salvo nel Drive…');
@@ -351,12 +351,12 @@ function doRestore(){if(!S.acct||!GCID||bkBusy)return;
           var ac=S.acct,sent={};got.forEach(function(c){sent[c.id]=c.u||0});cats=got;S=Object.assign(defS(),(st&&st.S)||{});S.acct=ac;sane();refresh();
           S.bk={t:Date.now(),sig:JSON.stringify(stateObj()),sent:sent};saveS();bkBusy=false;show('home');toast('Album ripristinato')})})})
   }).catch(function(e){bkErr(e,true)})}
-function afterLogin(t){dlist(t).then(function(m){if(m['state.json']&&!S.bk)dlg('Backup trovato',[['Ripristina',function(){doRestore()}],['Più tardi']],{text:'Nel tuo Drive c’è già un backup. Vuoi ripristinarlo su questo telefono? Sostituirà l’album che hai ora.'});else doBackup(true)}).catch(function(){})}
+function afterLogin(t){dlist(t).then(function(m){if(m['state.json']&&!S.bk)dlg('Backup trovato',[['Ripristina',function(){doRestore()}],['Più tardi']],{text:'Nel tuo Drive c’è già un backup. Vuoi ripristinarlo su questo telefono? Sostituirà l’album che hai ora.'});else doBackup(true)}).catch(function(e){bkErr(e,true)})}
 function doLogin(){if(!GCID)return;
   getTok(true).then(function(t){if(!google.accounts.oauth2.hasGrantedAllScopes(lastR,DR)){tok=null;dlg('Permesso mancante',[['Riprova',doLogin],['Annulla']],{text:'Per salvare il backup devi spuntare il permesso per Google Drive nella schermata di Google.'});return}
     return fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+t}}).then(function(r){return r.json()}).then(function(u){if(!u||!u.sub)throw new Error('userinfo');
       S.acct={sub:u.sub,email:u.email||'',name:u.name||'',pic:u.picture||'',t:Date.now()};S.bk=null;refresh();toast('Account collegato');afterLogin(t)})
-  }).catch(function(e){bkErr(e,true)})}
+  }).catch(function(e){var m=String((e&&e.message)||e);if(/popup_closed|popup_failed|access_denied|auth/.test(m)){dlg('Accesso non completato',[['Riprova',doLogin],['Annulla']],{text:'La finestra di Google si è chiusa prima di finire. Se Google mostrava un errore, dimmi cosa diceva. Codice: '+m})}else bkErr(e,true)})}
 function acctName(){var a=S.acct;return a?(a.name||a.email||'').split(' ')[0].slice(0,14):''}
 function bkTxt(){var b=S.bk;if(!b)return 'Nessun backup ancora.';var d=new Date(b.t);return 'Ultimo backup: '+dmy(b.t)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+'.'}
 function acctDlg(){
